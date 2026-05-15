@@ -8,9 +8,7 @@
  *  - Typed helpers for every backend endpoint
  */
 
-const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL || "https://pgagi-ml-assignement-backend-1.onrender.com/api"
-).replace(/\/$/, "");   // strip trailing slash so paths like "/health" join cleanly
+const API_BASE_URL = "https://pgagi-ml-assignement-backend-1.onrender.com/api";
 
 /** Fetch with automatic timeout and response-time logging. */
 async function request(path, options = {}, timeoutMs = 30_000) {
