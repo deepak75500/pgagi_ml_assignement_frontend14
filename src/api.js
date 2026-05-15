@@ -9,8 +9,8 @@
  */
 
 const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL || "https://pgagi-ml-assignement-backend-1.onrender.com/api/"
-).replace(/\/$/, "");
+  import.meta.env.VITE_API_BASE_URL || "https://pgagi-ml-assignement-backend-1.onrender.com/api"
+).replace(/\/$/, "");   // strip trailing slash so paths like "/health" join cleanly
 
 /** Fetch with automatic timeout and response-time logging. */
 async function request(path, options = {}, timeoutMs = 30_000) {
@@ -21,7 +21,21 @@ async function request(path, options = {}, timeoutMs = 30_000) {
   const controller = new AbortController();
   const timer      = setTimeout(() => controller.abort(), timeoutMs);
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // IMPORTANT: credentials must be "omit" (not "include").
+  //
+  // "include" tells the browser this request carries cookies / auth headers,
+  // which forces a CORS preflight that requires the server to respond with
+  //   Access-Control-Allow-Credentials: true
+  // FastAPI's CORSMiddleware only sends that header when allow_credentials=True.
+  // Our backend has allow_credentials=False, so the preflight fails → blocked.
+  //
+  // We have no session cookies to send, so "omit" is both correct and safe.
+  // ─────────────────────────────────────────────────────────────────────────
+  const credentials = "omit";
+
   const headers = {
+    // Don't set Content-Type for FormData — browser sets it with the boundary.
     ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
     Accept: "application/json",
     ...(options.headers || {}),
@@ -30,23 +44,26 @@ async function request(path, options = {}, timeoutMs = 30_000) {
   let response;
   try {
     response = await fetch(url, {
-      method,
-      credentials: "include",
       ...options,
+      method,
+      credentials,
       headers,
       signal: controller.signal,
     });
   } catch (err) {
     clearTimeout(timer);
-    if (err.name === "AbortError") throw new Error(`Request timed out after ${timeoutMs / 1000}s`);
+    if (err.name === "AbortError")
+      throw new Error(`Request timed out after ${timeoutMs / 1000}s — the server may be cold-starting, please retry.`);
     throw err;
   } finally {
     clearTimeout(timer);
   }
 
   const elapsed = performance.now() - t0;
-  if (elapsed > 3000) console.warn(`[API] Slow call (${(elapsed / 1000).toFixed(1)}s): ${method} ${path}`);
+  if (elapsed > 3000)
+    console.warn(`[API] Slow call (${(elapsed / 1000).toFixed(1)}s): ${method} ${path}`);
 
+  // ── Parse response ────────────────────────────────────────────────────────
   const contentType = response.headers.get("content-type") || "";
   let payload;
   try {
@@ -62,7 +79,7 @@ async function request(path, options = {}, timeoutMs = 30_000) {
       typeof payload === "object" && !(payload instanceof Blob)
         ? payload.detail || payload.error || JSON.stringify(payload)
         : String(payload);
-    throw new Error(detail || `Request failed with ${response.status}`);
+    throw new Error(detail || `Request failed with status ${response.status}`);
   }
 
   return payload;
@@ -108,7 +125,7 @@ export const api = {
     });
   },
 
-  /** Upload resume — generous 90 s timeout for large files + parsing. */
+  /** Upload resume file — generous 90 s timeout for large files + parsing. */
   uploadResume({ sessionId, file }) {
     const form = new FormData();
     form.append("session_id", sessionId);
@@ -118,16 +135,21 @@ export const api = {
 
   /** Submit pasted resume text instead of uploading a file. */
   uploadResumeText({ sessionId, resumeText }) {
-  return request("/session/upload-resume-text", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },   // ← add this
-    body: JSON.stringify({
-      session_id: sessionId,
-      resume_text: resumeText,
-      filename: "pasted-resume.txt",
-    }),
-  }, 90_000);
-},
+    return request(
+      "/session/upload-resume-text",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          session_id:  sessionId,
+          resume_text: resumeText,
+          filename:    "pasted-resume.txt",
+        }),
+        // Content-Type: application/json is set automatically by the
+        // request() helper for non-FormData bodies — no need to repeat it here.
+      },
+      90_000,
+    );
+  },
 
   getQuestion(sessionId) {
     return request(`/session/${sessionId}/question`);
@@ -147,7 +169,7 @@ export const api = {
 
   getEvaluation({ sessionId, questionId }) {
     return request(
-      `/session/${sessionId}/evaluation?question_id=${encodeURIComponent(questionId)}`
+      `/session/${sessionId}/evaluation?question_id=${encodeURIComponent(questionId)}`,
     );
   },
 
