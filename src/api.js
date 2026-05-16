@@ -128,7 +128,7 @@ export const api = {
     const form = new FormData();
     form.append("session_id", sessionId);
     form.append("file", file);
-    return request("/session/upload-resume", { method: "POST", body: form }, 90_000);
+    return request("/session/upload-resume", { method: "POST", body: form }, 300_000);
   },
 
   /** Submit pasted resume text instead of uploading a file. */
@@ -145,7 +145,7 @@ export const api = {
         // Content-Type: application/json is set automatically by the
         // request() helper for non-FormData bodies — no need to repeat it here.
       },
-      90_000,
+      300_000,
     );
   },
 
