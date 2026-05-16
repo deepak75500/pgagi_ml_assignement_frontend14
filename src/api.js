@@ -11,7 +11,7 @@
 const API_BASE_URL = "https://pgagi-ml-assignement-backend-1.onrender.com/api";
 
 /** Fetch with automatic timeout and response-time logging. */
-async function request(path, options = {}, timeoutMs = 30_000) {
+async function request(path, options = {}, timeoutMs = 300_000) {
   const url    = `${API_BASE_URL}${path}`;
   const method = options.method || "GET";
   const t0     = performance.now();
@@ -172,7 +172,7 @@ export const api = {
   },
 
   completeSession(sessionId) {
-    return request(`/session/${sessionId}/complete`, { method: "POST" }, 60_000);
+    return request(`/session/${sessionId}/complete`, { method: "POST" }, 300_000);
   },
 
   getSummary(sessionId) {
@@ -203,7 +203,7 @@ export const api = {
   /** Download session summary as PDF — triggers browser file-save. */
   async downloadSessionPdf(sessionId, candidateName = "summary") {
     const filename = `interview-${candidateName.replace(/\s+/g, "-")}-${sessionId.slice(0, 8)}.pdf`;
-    const blob     = await request(`/session/${sessionId}/download-pdf`, {}, 60_000);
+    const blob     = await request(`/session/${sessionId}/download-pdf`, {}, 300_000);
     if (!(blob instanceof Blob)) throw new Error("PDF download returned unexpected data.");
     _triggerDownload(blob, filename);
     return { success: true, filename };
